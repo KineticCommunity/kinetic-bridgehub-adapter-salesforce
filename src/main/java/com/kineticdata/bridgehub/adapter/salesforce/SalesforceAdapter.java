@@ -8,6 +8,7 @@ package com.kineticdata.bridgehub.adapter.salesforce;
 import com.kineticdata.bridgehub.adapter.BridgeAdapter;
 import com.kineticdata.bridgehub.adapter.BridgeError;
 import com.kineticdata.bridgehub.adapter.BridgeRequest;
+import com.kineticdata.bridgehub.adapter.BridgeUtils;
 import com.kineticdata.bridgehub.adapter.Count;
 import com.kineticdata.bridgehub.adapter.Record;
 import com.kineticdata.bridgehub.adapter.RecordList;
@@ -16,6 +17,7 @@ import com.kineticdata.commons.v1.config.ConfigurablePropertyMap;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -42,6 +44,20 @@ public class SalesforceAdapter implements BridgeAdapter {
     
     /** Defines the logger */
     protected static final org.slf4j.Logger logger = LoggerFactory.getLogger(SalesforceAdapter.class);
+
+    /** Adapter version constant. */
+    public static String VERSION;
+    /** Load the properties version from the version.properties file. */
+    static {
+        try {
+            java.util.Properties properties = new java.util.Properties();
+            properties.load(SalesforceAdapter.class.getResourceAsStream("/"+SalesforceAdapter.class.getName()+".version"));
+            VERSION = properties.getProperty("version");
+        } catch (IOException e) {
+            logger.warn("Unable to load "+SalesforceAdapter.class.getName()+" version properties.", e);
+            VERSION = "Unknown";
+        }
+    }
     
     /** Defines the collection of property names for the adapter. */
     public static class Properties {
@@ -63,12 +79,14 @@ public class SalesforceAdapter implements BridgeAdapter {
     private SchemaCache schemaCache;
     private OAuth oauth;
     
+    protected final String apiVersion = "v37.0";
+    
     private final ConfigurablePropertyMap properties = new ConfigurablePropertyMap(
         new ConfigurableProperty(Properties.PROPERTY_USERNAME).setIsRequired(true),
         new ConfigurableProperty(Properties.PROPERTY_PASSWORD).setIsRequired(true).setIsSensitive(true),
         new ConfigurableProperty(Properties.PROPERTY_TOKEN).setIsRequired(true),
         new ConfigurableProperty(Properties.PROPERTY_CLIENT_ID).setIsRequired(true),
-        new ConfigurableProperty(Properties.PROPERTY_CLIENT_SECRET).setIsRequired(true),
+        new ConfigurableProperty(Properties.PROPERTY_CLIENT_SECRET).setIsRequired(true).setIsSensitive(true),
         new ConfigurableProperty(Properties.PROPERTY_SALESFORCE_INSTANCE).setIsRequired(true)
     );
     
@@ -82,7 +100,7 @@ public class SalesforceAdapter implements BridgeAdapter {
     
     @Override
     public String getVersion() {
-       return  "1.0.0";
+       return VERSION;
     }
     
     @Override
@@ -134,10 +152,6 @@ public class SalesforceAdapter implements BridgeAdapter {
      */
     @Override
     public Count count(BridgeRequest request) throws BridgeError {
-        // Log the access
-        logger.trace("Counting the Salesforce Records");
-        logger.trace("  Structure: " + request.getStructure());
-        logger.trace("  Query: " + request.getQuery());
         long startTime = System.nanoTime();
         
         // Initialize the result data and response variables
@@ -155,7 +169,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         // Builds and encodes the whole URL, while putting it into HTTPGet
         // form. Then adds the authorization header with the current OAuth
         // access token.
-        HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/v28.0/query/?q=",this.salesforceInstance) + URLEncoder.encode(query));
+        HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/%s/query/?q=",this.salesforceInstance,apiVersion) + URLEncoder.encode(query));
         get.setHeader("Authorization", "OAuth " + this.accessToken);
         HttpResponse response;
         
@@ -218,12 +232,6 @@ public class SalesforceAdapter implements BridgeAdapter {
      */
     @Override
     public Record retrieve(BridgeRequest request) throws BridgeError {
-        // Log the access
-        logger.trace("Retrieving Salesforce Record");
-        logger.trace("  Structure: " + request.getStructure());
-        logger.trace("  Query: " + request.getQuery());
-        logger.trace("  Fields: " + request.getFieldString());
-
         // Initialize the result data and response variables
         Map<String,Object> data = new LinkedHashMap();
         String output = "";
@@ -236,7 +244,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         // Builds and encodes the whole URL, while putting it into HTTPGet
         // form. Then adds the authorization header with the current OAuth
         // access token.
-        HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/v28.0/query/?q=",this.salesforceInstance) + URLEncoder.encode(query));
+        HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/%s/query/?q=",this.salesforceInstance,apiVersion) + URLEncoder.encode(query));
         get.setHeader("Authorization", "OAuth " + this.accessToken);
         HttpResponse response;
 
@@ -282,7 +290,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         }
 
         // Returning the response
-        return new Record(data);
+        return new Record((Map)data.get("record"));
     }
 
     /**
@@ -299,12 +307,6 @@ public class SalesforceAdapter implements BridgeAdapter {
      */
     @Override
     public RecordList search(BridgeRequest request) throws BridgeError {
-        // Log the access
-        logger.trace("Searching Salesforce Records");
-        logger.trace("  Structure: " + request.getStructure());
-        logger.trace("  Query: " + request.getQuery());
-        logger.trace("  Fields: " + request.getFieldString());
-        
         Long startAllTime = System.nanoTime();
 
         // Initialize the result data and response variables
@@ -324,7 +326,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         // Builds and encodes the whole URL, while putting it into HTTPGet
         // form. Then adds the authorization header with the current OAuth
         // access token.
-        HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/v28.0/query/?q=",this.salesforceInstance) + URLEncoder.encode(query));
+        HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/%s/query/?q=",this.salesforceInstance,apiVersion) + URLEncoder.encode(query));
         get.setHeader("Authorization", "OAuth " + this.accessToken);
         HttpResponse response;
 
@@ -414,7 +416,12 @@ public class SalesforceAdapter implements BridgeAdapter {
         
         for (int i=0; i < jsonArray.size(); i++) {
             JSONObject recordObject = (JSONObject)jsonArray.get(i);
-            records.add(new Record((Map<String,Object>)recordObject));
+            Map<String,Object> record = new HashMap<String,Object>();
+            for (Map.Entry<String,Object> entry : ((Map<String,Object>)recordObject).entrySet()) {
+                record.put(entry.getKey(),toString(entry.getValue()));
+            }
+            records.add(new Record(record));
+//            records.add(new Record((Map<String,Object>)recordObject));
         }
 
         // Returning the response
@@ -504,7 +511,7 @@ public class SalesforceAdapter implements BridgeAdapter {
                 // SELECT 1,2,3,4,5 from Test ORDER BY 1,2,3,4,5 ASC2
                 if (request.getFields() != null) {
                     queryBuilder.append(" ORDER BY ");
-                    queryBuilder.append(StringUtils.join(request.getFields(),","));
+                    queryBuilder.append(StringUtils.join(schema.buildSortableFields(request.getFields()),","));
                     queryBuilder.append(" ASC");
                 }
             }
@@ -515,12 +522,12 @@ public class SalesforceAdapter implements BridgeAdapter {
                 String order = request.getMetadata("order");
                 List<String> allFields = new ArrayList<String>(request.getFields());
                 queryBuilder.append(" ORDER BY ");
-//                for (Map.Entry<String,String> entry : SalesforceQualificationParser.parse(order).entrySet()) {
-//                    String key = entry.getKey();
-//                    allFields.remove(key);
-//                    queryBuilder.append(key + " " + entry.getValue());
-//                    queryBuilder.append(",");
-//                }
+                for (Map.Entry<String,String> entry : BridgeUtils.parseOrder(order).entrySet()) {
+                    String key = entry.getKey();
+                    allFields.remove(key);
+                    queryBuilder.append(key + " " + entry.getValue());
+                    queryBuilder.append(",");
+                }
                 ArrayList<String> remainingSortable = schema.buildSortableFields(allFields);
                 if (!remainingSortable.isEmpty()) {
                     queryBuilder.append(StringUtils.join(remainingSortable,","));
@@ -761,6 +768,30 @@ public class SalesforceAdapter implements BridgeAdapter {
 
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
+    }
+    
+           /**
+       * Returns the string value of the object.
+       * <p>
+       * If the value is not a String, a JSON representation of the object will be returned.
+       * 
+       * @param value
+       * @return 
+       */
+    private String toString(Object value) {
+        String result = null;
+        if (value != null) {
+            if (String.class.isInstance(value)) {
+                result = (String)value;
+            } else {
+                result = JSONValue.toJSONString(value);
+            }
+        }
+        return result;
+     }
+    
+    public String getApiVersion() {
+        return this.apiVersion;
     }
     
 }

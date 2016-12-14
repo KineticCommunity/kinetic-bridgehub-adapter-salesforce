@@ -88,7 +88,7 @@ public class SchemaCache {
         // Build the call to get the descrtption of the Structure
         HttpClient client = new DefaultHttpClient();
         String httpURL = String.format("https://%s.salesforce.com/services/data"
-                + "/v28.0/sobjects/%s/describe",this.oauth.getSalesforceInstance(), schemaName.trim());
+                + "/v37.0/sobjects/%s/describe",this.oauth.getSalesforceInstance(),schemaName.trim());
         logger.debug(httpURL);
         HttpGet get = new HttpGet(httpURL);
         get.setHeader("Authorization", "OAuth " + this.accessToken);
