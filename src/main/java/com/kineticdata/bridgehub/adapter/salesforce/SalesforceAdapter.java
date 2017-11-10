@@ -27,7 +27,7 @@ import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
@@ -39,10 +39,10 @@ public class SalesforceAdapter implements BridgeAdapter {
     /*----------------------------------------------------------------------------------------------
      * PROPERTIES
      *--------------------------------------------------------------------------------------------*/
-    
+
     /** Defines the adapter display name. */
     public static final String NAME = "Salesforce Bridge";
-    
+
     /** Defines the logger */
     protected static final org.slf4j.Logger logger = LoggerFactory.getLogger(SalesforceAdapter.class);
 
@@ -59,7 +59,7 @@ public class SalesforceAdapter implements BridgeAdapter {
             VERSION = "Unknown";
         }
     }
-    
+
     /** Defines the collection of property names for the adapter. */
     public static class Properties {
         public static final String PROPERTY_USERNAME = "Username";
@@ -69,7 +69,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         public static final String PROPERTY_CLIENT_SECRET = "Client Secret";
         public static final String PROPERTY_SALESFORCE_INSTANCE = "Salesforce Instance";
     }
-    
+
     private String username;
     private String password;
     private String propertyToken;
@@ -79,9 +79,9 @@ public class SalesforceAdapter implements BridgeAdapter {
     private String accessToken;
     private SchemaCache schemaCache;
     private OAuth oauth;
-    
+
     protected final String apiVersion = "v37.0";
-    
+
     private final ConfigurablePropertyMap properties = new ConfigurablePropertyMap(
         new ConfigurableProperty(Properties.PROPERTY_USERNAME).setIsRequired(true),
         new ConfigurableProperty(Properties.PROPERTY_PASSWORD).setIsRequired(true).setIsSensitive(true),
@@ -90,7 +90,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         new ConfigurableProperty(Properties.PROPERTY_CLIENT_SECRET).setIsRequired(true).setIsSensitive(true),
         new ConfigurableProperty(Properties.PROPERTY_SALESFORCE_INSTANCE).setIsRequired(true)
     );
-    
+
     /*---------------------------------------------------------------------------------------------
      * SETUP METHODS
      *-------------------------------------------------------------------------------------------*/
@@ -98,22 +98,22 @@ public class SalesforceAdapter implements BridgeAdapter {
     public String getName() {
         return NAME;
     }
-    
+
     @Override
     public String getVersion() {
        return VERSION;
     }
-    
+
     @Override
     public ConfigurablePropertyMap getProperties() {
         return properties;
     }
-    
+
     @Override
     public void setProperties(Map<String,String> parameters) {
         properties.setValues(parameters);
     }
-     
+
     @Override
     public void initialize() throws BridgeError {
         // Testing the configuration values to make sure that they
@@ -135,26 +135,26 @@ public class SalesforceAdapter implements BridgeAdapter {
         );
 
         this.accessToken = oauth.getAccessToken();
-       
+
         this.schemaCache = new SchemaCache(this.accessToken, this.oauth);
     }
-    
+
     /*---------------------------------------------------------------------------------------------
      * IMPLEMENTATION METHODS
      *-------------------------------------------------------------------------------------------*/
-    
+
     /**
      * This method returns a JSON String that contains just one name,value pair
      * containing the total amount of records that the query returned
      *
      * @param request
-     * @return 
+     * @return
      * @throws BridgeError
      */
     @Override
     public Count count(BridgeRequest request) throws BridgeError {
         long startTime = System.nanoTime();
-        
+
         // Initialize the result data and response variables
         Map<String,Object> data = new LinkedHashMap();
         String output = "";
@@ -164,7 +164,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         field.add("Count()");
         request.setFields(field);
 
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         String query = buildSalesforceQuery(request, "count");
 
         // Builds and encodes the whole URL, while putting it into HTTPGet
@@ -173,7 +173,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         HttpGet get = new HttpGet(String.format("https://%s.salesforce.com/services/data/%s/query/?q=",this.salesforceInstance,apiVersion) + URLEncoder.encode(query));
         get.setHeader("Authorization", "OAuth " + this.accessToken);
         HttpResponse response;
-        
+
         try {
             // Executing the GET call and then retrieving Salesforce's response
             response = client.execute(get);
@@ -181,7 +181,7 @@ public class SalesforceAdapter implements BridgeAdapter {
             output = EntityUtils.toString(entity);
 
             // Checks if the request has failed because of an invalid accessToken.
-            // The message that is returned is [{"message":"Session expired or 
+            // The message that is returned is [{"message":"Session expired or
             // invalid","errorCode":"INVALID_SESSION_ID"}], so if the JSON output
             // contains INVALID_SESSION_ID, we re-authenticate and then try the
             // GET request again (this is due to session timeout of the access
@@ -202,10 +202,10 @@ public class SalesforceAdapter implements BridgeAdapter {
         }
         catch (IOException e) {
             throw new BridgeError("Unable to make a connection to properly execute the"
-                    + "query to Salesforce"); 
+                    + "query to Salesforce");
         }
 
-        // Parsing the response to retrieve the totalSize(count) of the 
+        // Parsing the response to retrieve the totalSize(count) of the
         // SOQL Query
         if (response.getStatusLine().getStatusCode() != 200) {
             parseError(output);
@@ -216,7 +216,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         long endTime = System.nanoTime();
         long methodTime = endTime - startTime;
         logger.trace("Build count method length: " + String.valueOf((double)methodTime / 1000000000.0) + " seconds");
-        
+
         Long count = Long.parseLong(data.get("count").toString());
 
         //Return the response
@@ -228,7 +228,7 @@ public class SalesforceAdapter implements BridgeAdapter {
      * of the requested fields
      *
      * @param request
-     * @return 
+     * @return
      * @throws BridgeError
      */
     @Override
@@ -239,9 +239,9 @@ public class SalesforceAdapter implements BridgeAdapter {
 
         // Calling a helper method to build the query string that is then used
         // so that we can make it into a HttpGet object
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         String query = buildSalesforceQuery(request, "retrieve");
-        
+
         // Builds and encodes the whole URL, while putting it into HTTPGet
         // form. Then adds the authorization header with the current OAuth
         // access token.
@@ -257,13 +257,13 @@ public class SalesforceAdapter implements BridgeAdapter {
             output = EntityUtils.toString(entity);
 
             // Checks if the request has failed because of an invalid accessToken.
-            // The message that is returned is [{"message":"Session expired or 
+            // The message that is returned is [{"message":"Session expired or
             // invalid","errorCode":"INVALID_SESSION_ID"}], so if the JSON output
             // contains INVALID_SESSION_ID, we re-authenticate and then try the
             // GET request again
             if (output.contains("INVALID_SESSION_ID")) {
-                logger.debug("Invalid access token. Calling the authentication method " 
-                        + "to retrieve a new token"); 
+                logger.debug("Invalid access token. Calling the authentication method "
+                        + "to retrieve a new token");
                 this.accessToken = this.oauth.getAccessToken();
                 get.setHeader("Authorization", "OAuth " + this.accessToken);
 
@@ -277,7 +277,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         }
         catch (IOException e) {
             throw new BridgeError("Unable to make a connection to properly execute the"
-                    + "query to Salesforce"); 
+                    + "query to Salesforce");
         }
 
         // Parsing the response, checking to make sure it returned only a single
@@ -303,7 +303,7 @@ public class SalesforceAdapter implements BridgeAdapter {
      * page number, offset, count, size) from this query.
      *
      * @param request
-     * @return 
+     * @return
      * @throws BridgeError
      */
     @Override
@@ -317,7 +317,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         // Calling a helper method to build the query string that is then used
         // so that we can make it into a HttpGet object. Also, getting
         // the metadata so that it can be passed to buildSalesforceQuery
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         Long startTopTime = System.nanoTime();
         // If no fields were passed in, created a comma separated list of all
         // the fields in the current structure to return all the fields
@@ -331,7 +331,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         long endTopTime = System.nanoTime();
         long topTime = endTopTime - startTopTime;
         logger.trace("Top time call length: " + String.valueOf((double)topTime / 1000000000.0) + " seconds");
-                
+
         // Builds and encodes the whole URL, while putting it into HTTPGet
         // form. Then adds the authorization header with the current OAuth
         // access token.
@@ -354,13 +354,13 @@ public class SalesforceAdapter implements BridgeAdapter {
             output = EntityUtils.toString(entity);
 
             // Checks if the request has failed because of an invalid accessToken.
-            // The message that is returned is [{"message":"Session expired or 
+            // The message that is returned is [{"message":"Session expired or
             // invalid","errorCode":"INVALID_SESSION_ID"}], so if the JSON output
             // contains INVALID_SESSION_ID, we re-authenticate and then try the
             // GET request again
             if (output.contains("INVALID_SESSION_ID")) {
-                logger.debug("Invalid access token. Calling the authentication method " 
-                        + "to retrieve a new token"); 
+                logger.debug("Invalid access token. Calling the authentication method "
+                        + "to retrieve a new token");
                 this.accessToken = this.oauth.getAccessToken();
                 get.setHeader("Authorization", "OAuth " + this.accessToken);
 
@@ -372,7 +372,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         }
         catch (IOException e) {
             throw new BridgeError("Unable to make a connection to properly execute the"
-                    + "query to Salesforce"); 
+                    + "query to Salesforce");
         }
 
         // Building the output metadata
@@ -412,17 +412,17 @@ public class SalesforceAdapter implements BridgeAdapter {
             Long count = Long.valueOf(count(request).getValue());
             outputMetadata.put("count", count);
         }
-        
+
         long endAllTime = System.nanoTime();
         long methodTime = endAllTime - startAllTime;
         logger.trace("Search method call length: " + String.valueOf((double)methodTime / 1000000000.0) + " seconds");
-        
+
         JSONArray jsonArray;
         JSONObject jsonOutput = (JSONObject)JSONValue.parse(output);
         jsonArray = (JSONArray)jsonOutput.get("records");
 
         List<Record> records = new ArrayList<Record>();
-        
+
         for (int i=0; i < jsonArray.size(); i++) {
             JSONObject recordObject = (JSONObject)jsonArray.get(i);
             Map<String,Object> record = new HashMap<String,Object>();
@@ -444,7 +444,7 @@ public class SalesforceAdapter implements BridgeAdapter {
     /**
      * This method will be called when the result does not have to worry about
      * ordering its response (and thus doesn't have to worry about metadata)
-     * 
+     *
      * @param request
      * @param method
      * @return
@@ -457,8 +457,8 @@ public class SalesforceAdapter implements BridgeAdapter {
     /**
      * Builds a SOQL request so that it can be used to retrieve the needed
      * information from Salesforce. Returns an HttpGet request that can then
-     * be executed after it has been returned. 
-     * 
+     * be executed after it has been returned.
+     *
      * @param request
      * @param method
      * @param metadata
@@ -467,7 +467,7 @@ public class SalesforceAdapter implements BridgeAdapter {
      */
     private String buildSalesforceQuery(BridgeRequest request, String method, Map<String,String> metadata) throws BridgeError {
         logger.trace("Building the Salesforce SOQL Query");
-           
+
         // Builds to SOQL request from the given BridgeRequest parameters
         // --Example Situation--
         // If Structure=Account&Fields=[Name]&Query=* the string that will
@@ -482,7 +482,7 @@ public class SalesforceAdapter implements BridgeAdapter {
 //            throw new BridgeError("Invalid Request: Missing the 'Fields' parameter");
 //        }
 
-        // Parsing the query to include parameters if they have been used. 
+        // Parsing the query to include parameters if they have been used.
         SalesforceQualificationParser parser = new SalesforceQualificationParser();
         String query = parser.parse(request.getQuery(),request.getParameters());
 
@@ -504,10 +504,10 @@ public class SalesforceAdapter implements BridgeAdapter {
         Long startTopTime = System.nanoTime();
         if (method.equals("search")) {
             logger.trace("Building ORDER BY data for the query");
-            // Build the order of the sorting fields when method = search. First 
-            // priority is to use the metadata if it has been inputted by the 
-            // user. If there is no order metadata though, the order will be 
-            // sorted in the order that the fields were entered (in ascending 
+            // Build the order of the sorting fields when method = search. First
+            // priority is to use the metadata if it has been inputted by the
+            // user. If there is no order metadata though, the order will be
+            // sorted in the order that the fields were entered (in ascending
             // order)
             // --Example Situation--
             // SELECT 1,2,3,4,5 from Test is expanded to...
@@ -543,8 +543,8 @@ public class SalesforceAdapter implements BridgeAdapter {
                 }
                 ArrayList<String> remainingSortable = schema.buildSortableFields(allFields);
                 if (!remainingSortable.isEmpty()) {
-                    // Sublist the remaining sortable fields by 10 to stay safely 
-                    // under the max 32 ORDER BY fields 
+                    // Sublist the remaining sortable fields by 10 to stay safely
+                    // under the max 32 ORDER BY fields
                     int endOfListOr10 = remainingSortable.size() > 10 ? 10 : remainingSortable.size();
                     queryBuilder.append(StringUtils.join(remainingSortable.subList(0, endOfListOr10),","));
                     queryBuilder.append(" ASC");
@@ -568,7 +568,7 @@ public class SalesforceAdapter implements BridgeAdapter {
         }
         long endTopTime = System.nanoTime();
         long topTime = endTopTime - startTopTime;
-        logger.trace("Sorting time length: " + String.valueOf((double)topTime / 1000000000.0) + " seconds");   
+        logger.trace("Sorting time length: " + String.valueOf((double)topTime / 1000000000.0) + " seconds");
 
         logger.trace("SOQL Query: " + queryBuilder);
 
@@ -580,7 +580,7 @@ public class SalesforceAdapter implements BridgeAdapter {
     /**
      * This method will be called when the result does not have to worry about
      * configuring outputMetadata.
-     * 
+     *
      * @param request
      * @param method
      * @return
@@ -682,14 +682,14 @@ public class SalesforceAdapter implements BridgeAdapter {
      * separates the fields into an array and the records (without the fields)
      * into an array of arrays. Returns a LinkedHashMap containing the fields
      * and records data.
-     * 
+     *
      * @param jsonOutput
      * @return
      * @throws BridgeError
      */
     private Map<String,Object> buildSearchOutput(BridgeRequest request, JSONObject jsonOutput) {
         logger.trace("Building the fields and records output");
-            
+
         // Parsing the output JSON
         JSONArray jsonArray = (JSONArray)jsonOutput.get("records");
 
@@ -715,12 +715,12 @@ public class SalesforceAdapter implements BridgeAdapter {
         // Returning the metadata
         return splitData;
     }
-    
+
     /**
-     * A helper method used to set the default metadata values that will be used 
-     * for the call to Salesforce. If no values have been inputted by the user, 
+     * A helper method used to set the default metadata values that will be used
+     * for the call to Salesforce. If no values have been inputted by the user,
      * the method will set the values at logical default values.
-     * 
+     *
      * @param request
      * @return
      * @throws BridgeError
@@ -785,14 +785,14 @@ public class SalesforceAdapter implements BridgeAdapter {
     public void setAccessToken(String accessToken) {
         this.accessToken = accessToken;
     }
-    
+
            /**
        * Returns the string value of the object.
        * <p>
        * If the value is not a String, a JSON representation of the object will be returned.
-       * 
+       *
        * @param value
-       * @return 
+       * @return
        */
     private String toString(Object value) {
         String result = null;
@@ -805,9 +805,9 @@ public class SalesforceAdapter implements BridgeAdapter {
         }
         return result;
      }
-    
+
     public String getApiVersion() {
         return this.apiVersion;
     }
-    
+
 }

@@ -19,7 +19,7 @@ import org.apache.http.NameValuePair;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.HttpPost;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.apache.http.message.BasicNameValuePair;
 import org.json.simple.parser.ContainerFactory;
 import org.json.simple.parser.JSONParser;
@@ -38,18 +38,18 @@ public class OAuth {
      *-------------------------------------------------------------------------------------------*/
 
      /**
-     * The security token associated with the account used for record 
-     * retrieval. To reset this value, log into Saleforce using the desired 
-     * account and navigate to Setup -> My Personal Information -> Reset 
+     * The security token associated with the account used for record
+     * retrieval. To reset this value, log into Saleforce using the desired
+     * account and navigate to Setup -> My Personal Information -> Reset
      * Security Token. A new token will be emailed to you.
      */
     private String token;
-    
+
     /**
      *  The username of the account that will be used for record retrieval.
      */
     private String username;
-    
+
     /**
      * The password of the account that will be used for record retrieval.
      */
@@ -69,7 +69,7 @@ public class OAuth {
 
     /**
      * The salesforce instance that your account is tied to. Can be found to the
-     * left of the salesforce url when you are logged into their website. For 
+     * left of the salesforce url when you are logged into their website. For
      * example, https://na15.salesforce.com, the instance is na15
      */
     private String salesforceInstance;
@@ -98,11 +98,11 @@ public class OAuth {
      *-------------------------------------------------------------------------------------------*/
 
     /**
-     * Queries Salesforce to authenticate using the information given to the 
+     * Queries Salesforce to authenticate using the information given to the
      * bridge upon initialization. If successful, the access token recieved from
      * Salesforce will be placed in the class variable accessToken so that it
      * can be accessed by the various methods.
-     * 
+     *
      * @return
      * @throws BridgeError
      */
@@ -114,7 +114,7 @@ public class OAuth {
 
         // Making a call to Salesforce using HttpClient to get the access
         // token from Salesforce
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         HttpPost post = new HttpPost(String.format("https://%s.salesforce.com/services/oauth2/token",this.salesforceInstance));
         try {
             // Setting up the parameters that will be passed with the HTTP
@@ -148,7 +148,7 @@ public class OAuth {
                 data = (Map)parser.parse(output, containerFactory);
                 logger.debug("Received authentication response:\n"+output);
                 accessToken = (String)data.get("access_token");
-            } 
+            }
             catch (Exception e) {
                 logger.error("Unable to parse response:\n"+output);
                 throw new BridgeError("Unable to parse JSON response");
@@ -156,7 +156,7 @@ public class OAuth {
         }
         catch (IOException e) {
             throw new BridgeError("Unable to make a connection to properly execute the"
-                    + "query to Salesforce"); 
+                    + "query to Salesforce");
         }
         if (accessToken == null) {
             throw new BridgeError("Authentication Failed: Unable to retrieve access token");

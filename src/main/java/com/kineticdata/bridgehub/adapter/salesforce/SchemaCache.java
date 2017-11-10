@@ -15,7 +15,7 @@ import java.util.Set;
 import org.apache.http.HttpResponse;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
-import org.apache.http.impl.client.DefaultHttpClient;
+import org.apache.http.impl.client.HttpClients;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.JSONValue;
@@ -28,19 +28,19 @@ import org.slf4j.LoggerFactory;
 public class SchemaCache {
     // Initialize the apache log
     protected static final org.slf4j.Logger logger = LoggerFactory.getLogger(SalesforceAdapter.class);
-    
+
     // Initializing the Map that will store the schemas
     private ConcurrentHashMap<String,Schema> cacheMap = new ConcurrentHashMap();
 
     /** The OAuth object that will use the users inputted configuration values
      * to authenticate with Salesforce to obtain an access token.
      */
-    private OAuth oauth; 
+    private OAuth oauth;
 
     /**
      * The access token that will be used to authenticate if retrieveSchema
      * has to be called.
-     */ 
+     */
     private String accessToken;
 
     public SchemaCache(String accessToken, OAuth oauth) {
@@ -86,7 +86,7 @@ public class SchemaCache {
         String output = "";
 
         // Build the call to get the descrtption of the Structure
-        HttpClient client = new DefaultHttpClient();
+        HttpClient client = HttpClients.createDefault();
         String httpURL = String.format("https://%s.salesforce.com/services/data"
                 + "/v37.0/sobjects/%s/describe",this.oauth.getSalesforceInstance(),schemaName.trim());
         logger.debug(httpURL);
@@ -102,7 +102,7 @@ public class SchemaCache {
                 output = output + line;
             }
             // Checks if the request has failed because of an invalid accessToken.
-            // The message that is returned is [{"message":"Session expired or 
+            // The message that is returned is [{"message":"Session expired or
             // invalid","errorCode":"INVALID_SESSION_ID"}], so if the JSON output
             // contains INVALID_SESSION_ID, we re-authenticate and then try the
             // GET request again
@@ -123,7 +123,7 @@ public class SchemaCache {
         }
         catch (IOException e) {
             throw new BridgeError("Unable to make a connection to properly execute the"
-                    + "query to Salesforce"); 
+                    + "query to Salesforce");
         }
 
         // Parsing the output string into a JSONObject (as well as checking for
@@ -165,7 +165,7 @@ public class SchemaCache {
 
     /**
      * DEBUGGING METHOD: Adds a value to the cacheMap.
-     */ 
+     */
     public void addSchema(String name, Schema schema) {
         cacheMap.put(name,schema);
     }
