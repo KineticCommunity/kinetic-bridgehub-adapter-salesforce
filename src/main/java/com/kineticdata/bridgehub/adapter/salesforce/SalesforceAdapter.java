@@ -17,6 +17,7 @@ import com.kineticdata.commons.v1.config.ConfigurablePropertyMap;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -318,6 +319,14 @@ public class SalesforceAdapter implements BridgeAdapter {
         // the metadata so that it can be passed to buildSalesforceQuery
         HttpClient client = new DefaultHttpClient();
         Long startTopTime = System.nanoTime();
+        // If no fields were passed in, created a comma separated list of all
+        // the fields in the current structure to return all the fields
+        if (request.getFields() == null || request.getFields().isEmpty()) {
+            // Get all the fields the schema, sort them, and then add them as the request fields
+            List<String> fields = new ArrayList<String>(this.schemaCache.getSchema(request.getStructure()).getSchema().keySet());
+            Collections.sort(fields);
+            request.setFields(fields);
+        }
         String query = buildSalesforceQuery(request, "search", null);
         long endTopTime = System.nanoTime();
         long topTime = endTopTime - startTopTime;
@@ -506,12 +515,16 @@ public class SalesforceAdapter implements BridgeAdapter {
             Schema schema = this.schemaCache.getSchema(request.getStructure());
             long endSchemaTime = System.nanoTime();
             long schemaTime = endSchemaTime - startSchemaTime;
-            logger.trace("Schema call length: " + String.valueOf((double)schemaTime / 1000000000.0) + " seconds"); 
+            logger.trace("Schema call length: " + String.valueOf((double)schemaTime / 1000000000.0) + " seconds");
+            List<String> sortableFields = schema.buildSortableFields(request.getFields());
             if (request.getMetadata("order") == null) {
                 // SELECT 1,2,3,4,5 from Test ORDER BY 1,2,3,4,5 ASC2
                 if (request.getFields() != null) {
                     queryBuilder.append(" ORDER BY ");
-                    queryBuilder.append(StringUtils.join(schema.buildSortableFields(request.getFields()),","));
+                    // Sublist the first 32 sortable fields, because that is the max number
+                    // of fields that ORDER BY allows
+                    int endOfListOr32 = sortableFields.size() > 32 ? 32 : sortableFields.size();
+                    queryBuilder.append(StringUtils.join(sortableFields.subList(0, endOfListOr32),","));
                     queryBuilder.append(" ASC");
                 }
             }
@@ -530,7 +543,10 @@ public class SalesforceAdapter implements BridgeAdapter {
                 }
                 ArrayList<String> remainingSortable = schema.buildSortableFields(allFields);
                 if (!remainingSortable.isEmpty()) {
-                    queryBuilder.append(StringUtils.join(remainingSortable,","));
+                    // Sublist the remaining sortable fields by 10 to stay safely 
+                    // under the max 32 ORDER BY fields 
+                    int endOfListOr10 = remainingSortable.size() > 10 ? 10 : remainingSortable.size();
+                    queryBuilder.append(StringUtils.join(remainingSortable.subList(0, endOfListOr10),","));
                     queryBuilder.append(" ASC");
                 }
                 else {

@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>com.kineticdata.bridges.adapter</groupId>
     <artifactId>kinetic-bridgehub-adapter-salesforce</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2-SNAPSHOT</version>
     <packaging>jar</packaging>
 
     <name>kinetic-bridgehub-adapter-salesforce</name>
@@ -11,6 +11,17 @@
         <connection>scm:git:https://github.com/kineticcommunity/kinetic-bridgehub-adapter-salesforce.git</connection>
         <developerConnection>scm:git:https://github.com/kineticcommunity/kinetic-bridgehub-adapter-salesforce.git</developerConnection>
     </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>com.kineticdata</id>
+            <url>http://utilities.kineticdata.com/nexus/content/repositories/releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>com.kineticdata.snapshots</id>
+            <url>http://utilities.kineticdata.com/nexus/content/repositories/snapshots</url>
+        </snapshotRepository>
+    </distributionManagement>
 
     <repositories>
         <repository>
